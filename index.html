@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sync & Split: Echo Rebound</title>
+    <title>Sync & Split</title>
     <style>
         body {
             margin: 0;
@@ -22,13 +22,13 @@
         }
         #ui {
             position: absolute;
-            top: 20px;
+            top: 25px;
             width: 100%;
             text-align: center;
             pointer-events: none;
-            font-size: 22px;
+            font-size: 20px;
             font-weight: bold;
-            letter-spacing: 2px;
+            letter-spacing: 1px;
             text-shadow: 0 0 10px rgba(0, 243, 255, 0.5);
             z-index: 10;
         }
@@ -36,7 +36,7 @@
 </head>
 <body>
 
-    <div id="ui">انقر لتحريك الكرات وتجاوز الحواجز</div>
+    <div id="ui">اضغط واستمر للتباعد، ارفع إصبعك للتقارب</div>
     <canvas id="gameCanvas"></canvas>
 
     <script>
@@ -52,65 +52,55 @@
 
         let score = 0;
         let isGameOver = false;
-        let gameSpeed = 3;
+        let gameSpeed = 3.5;
         let obstacles = [];
-        
-        let isReboundActive = false;
-        let reboundTimer = 0;
-        let flashAlpha = 0;
+        let isTouching = false;
 
-        // إحداثيات الكرات
+        // إحداثيات المواضع الثابتة (الداخل والخارج)
+        const leftInner = () => canvas.width / 2 - 45;
+        const leftOuter = () => 45;
+        const rightInner = () => canvas.width / 2 + 45;
+        const rightOuter = () => canvas.width - 45;
+
         const leftBall = {
-            x: canvas.width / 4,
-            y: canvas.height - 120,
+            x: leftInner(),
+            y: canvas.height - 130,
             radius: 16,
             color: '#00f3ff',
-            targetX: canvas.width / 4
+            targetX: leftInner()
         };
 
         const rightBall = {
-            x: (canvas.width / 4) * 3,
-            y: canvas.height - 120,
+            x: rightInner(),
+            y: canvas.height - 130,
             radius: 16,
             color: '#ff0055',
-            targetX: (canvas.width / 4) * 3
+            targetX: rightInner()
         };
 
-        // التحكم: النقر يمين أو يسار الشاشة يبدل موضع الكرة أفقياً لتتجنب الحاجز
-        window.addEventListener('pointerdown', (e) => {
+        // التحكم: الضغط يبعد الكرتين للخارج، والرفع يعيدهما للداخل
+        window.addEventListener('pointerdown', () => {
             if (isGameOver) {
                 resetGame();
                 return;
             }
-            const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            
-            if (x < canvas.width / 2) {
-                // تبديل موقع الكرة اليسرى يميناً أو يساراً داخل نصفها
-                leftBall.targetX = leftBall.targetX === canvas.width / 4 ? (canvas.width / 4) - 50 : canvas.width / 4;
-            } else {
-                // تبديل موقع الكرة اليمنى
-                rightBall.targetX = rightBall.targetX === (canvas.width / 4) * 3 ? ((canvas.width / 4) * 3) + 50 : (canvas.width / 4) * 3;
-            }
+            isTouching = true;
+        });
+
+        window.addEventListener('pointerup', () => {
+            isTouching = false;
         });
 
         function spawnObstacle() {
-            const halfW = canvas.width / 2;
+            // نوعان فقط من الحواجز بشكل واضح جداً:
+            // type 0: الحاجز يغلق الأطراف ويترك المنتصف مفتوحاً (تحتاج عدم الضغط)
+            // type 1: الحاجز يغلق المنتصف ويترك الأطراف مفتوحة (تحتاج الضغط والاستمرار)
+            const type = Math.random() < 0.5 ? 0 : 1;
             
-            // توليد عائق في النصف الأيسر بفتحة عبور
-            let leftGapPos = Math.random() * (halfW - 80) + 20;
-            // توليد عائق في النصف الأيمن بفتحة عبور
-            let rightGapPos = halfW + (Math.random() * (halfW - 80) + 20);
-
             obstacles.push({
-                y: -50,
-                height: 22,
-                // اليسار: قطعتان تتركان فراغا في المنتصف لمرور الكرة اليسرى
-                leftBlock1: { x: 10, width: leftGapPos - 10 },
-                leftBlock2: { x: leftGapPos + 70, width: halfW - (leftGapPos + 70) },
-                // اليمين: قطعتان تتركان فراغا لمرور الكرة اليمنى
-                rightBlock1: { x: halfW + 10, width: (rightGapPos - halfW) - 10 },
-                rightBlock2: { x: rightGapPos + 70, width: canvas.width - (rightGapPos + 70) - 10 },
+                y: -40,
+                height: 24,
+                type: type,
                 passed: false
             });
         }
@@ -120,57 +110,43 @@
         function update() {
             if (isGameOver) return;
 
-            if (isReboundActive) {
-                reboundTimer--;
-                flashAlpha = Math.sin(reboundTimer * 0.3) * 0.5 + 0.5;
-                if (reboundTimer <= 0) {
-                    isReboundActive = false;
-                    flashAlpha = 0;
-                }
+            // تحديث الأهداف بناء على الضغط
+            if (isTouching) {
+                leftBall.targetX = leftOuter();
+                rightBall.targetX = rightOuter();
+            } else {
+                leftBall.targetX = leftInner();
+                rightBall.targetX = rightInner();
             }
 
-            leftBall.x += (leftBall.targetX - leftBall.x) * 0.2;
-            rightBall.x += (rightBall.targetX - rightBall.x) * 0.2;
+            // حركة ناعمة وسريعة للكرات
+            leftBall.x += (leftBall.targetX - leftBall.x) * 0.25;
+            rightBall.x += (rightBall.targetX - rightBall.x) * 0.25;
 
-            gameSpeed += 0.0004;
+            gameSpeed += 0.0003;
 
             spawnTimer++;
-            if (spawnTimer > 100) { // مسافة مريحة بين الحواجز
+            if (spawnTimer > 90) {
                 spawnObstacle();
                 spawnTimer = 0;
             }
 
             for (let i = obstacles.length - 1; i >= 0; i--) {
-                obstacles[i].y += gameSpeed;
-
                 let obs = obstacles[i];
+                obs.y += gameSpeed;
 
-                // التحقق من اصطدام الكرة اليسرى بأي من قطعتي الحاجز الأيسر
-                let hitLeft = (
-                    leftBall.y + leftBall.radius > obs.y && leftBall.y - leftBall.radius < obs.y + obs.height &&
-                    (
-                        (leftBall.x + leftBall.radius > obs.leftBlock1.x && leftBall.x - leftBall.radius < obs.leftBlock1.x + obs.leftBlock1.width) ||
-                        (leftBall.x + leftBall.radius > obs.leftBlock2.x && leftBall.x - leftBall.radius < obs.leftBlock2.x + obs.leftBlock2.width)
-                    )
-                );
-
-                // التحقق من اصطدام الكرة اليمنى بأي من قطعتي الحاجز الأيمن
-                let hitRight = (
-                    rightBall.y + rightBall.radius > obs.y && rightBall.y - rightBall.radius < obs.y + obs.height &&
-                    (
-                        (rightBall.x + rightBall.radius > obs.rightBlock1.x && rightBall.x - rightBall.radius < obs.rightBlock1.x + obs.rightBlock1.width) ||
-                        (rightBall.x + rightBall.radius > obs.rightBlock2.x && rightBall.x - rightBall.radius < obs.rightBlock2.x + obs.rightBlock2.width)
-                    )
-                );
-
-                if (hitLeft || hitRight) {
-                    if (!isReboundActive) {
-                        isReboundActive = true;
-                        reboundTimer = 25;
-                        leftBall.targetX = canvas.width / 4;
-                        rightBall.targetX = (canvas.width / 4) * 3;
-                    } else {
-                        isGameOver = true;
+                // التثبت من الاصطدام عند وصول الحاجز لارتفاع الكرات
+                if (Math.abs(obs.y - leftBall.y) < leftBall.radius + obs.height / 2) {
+                    if (obs.type === 0) {
+                        // الممر في المنتصف: تخسر إذا كانت الكرات في الأطراف (الخارج)
+                        if (leftBall.x < leftInner() - 20 || rightBall.x > rightInner() + 20) {
+                            isGameOver = true;
+                        }
+                    } else if (obs.type === 1) {
+                        // الممر في الأطراف: تخسر إذا كانت الكرات في المنتصف (الداخل)
+                        if (leftBall.x > leftOuter() + 30 || rightBall.x < rightOuter() - 30) {
+                            isGameOver = true;
+                        }
                     }
                 }
 
@@ -185,33 +161,31 @@
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            if (flashAlpha > 0) {
-                ctx.fillStyle = `rgba(0, 243, 255, ${flashAlpha * 0.2})`;
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-            }
-
             // خط المنتصف
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
             ctx.lineWidth = 2;
-            ctx.setLineDash([5, 5]);
+            ctx.setLineDash([6, 6]);
             ctx.beginPath();
             ctx.moveTo(canvas.width / 2, 0);
             ctx.lineTo(canvas.width / 2, canvas.height);
             ctx.stroke();
             ctx.setLineDash([]);
 
-            // رسم الحواجز بفتحات واضحة
-            ctx.shadowBlur = 15;
+            // رسم الحواجز
+            ctx.shadowBlur = 12;
             ctx.fillStyle = '#ff3366';
             ctx.shadowColor = '#ff3366';
-            
+
             for (let obs of obstacles) {
-                // اليسار
-                ctx.fillRect(obs.leftBlock1.x, obs.y, obs.leftBlock1.width, obs.height);
-                ctx.fillRect(obs.leftBlock2.x, obs.y, obs.leftBlock2.width, obs.height);
-                // اليمين
-                ctx.fillRect(obs.rightBlock1.x, obs.y, obs.rightBlock1.width, obs.height);
-                ctx.fillRect(obs.rightBlock2.x, obs.y, obs.rightBlock2.width, obs.height);
+                if (obs.type === 0) {
+                    // فتحة بالمنتصف: نرسم كتلة باليسار وكتلة باليمين
+                    ctx.fillRect(0, obs.y, leftInner() - 25, obs.height);
+                    ctx.fillRect(rightInner() + 25, obs.y, canvas.width - (rightInner() + 25), obs.height);
+                } else {
+                    // فتحة بالأطراف: نرسم كتلة واحدة بالمنتصف تمنع المرور الداخلي
+                    const centerWidth = rightInner() - leftInner() + 40;
+                    ctx.fillRect(canvas.width / 2 - centerWidth / 2, obs.y, centerWidth, obs.height);
+                }
             }
 
             // رسم الكرات
@@ -230,18 +204,18 @@
             ctx.shadowBlur = 0;
 
             document.getElementById('ui').innerText = isGameOver ? 
-                `انتهت اللعبة! النتيجة: ${score}\nانقر لإعادة المحاولة` : 
+                `انتهت اللعبة! النتيجة: ${score}\nاضغط لإعادة المحاولة` : 
                 `النقاط: ${score}`;
         }
 
         function resetGame() {
             score = 0;
-            gameSpeed = 3;
+            gameSpeed = 3.5;
             obstacles = [];
             isGameOver = false;
-            isReboundActive = false;
-            leftBall.targetX = canvas.width / 4;
-            rightBall.targetX = (canvas.width / 4) * 3;
+            isTouching = false;
+            leftBall.targetX = leftInner();
+            rightBall.targetX = rightInner();
         }
 
         function loop() {
