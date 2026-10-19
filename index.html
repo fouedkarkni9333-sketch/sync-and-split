@@ -52,31 +52,33 @@
 
         let score = 0;
         let isGameOver = false;
-        let gameSpeed = 5;
+        let gameSpeed = 4;
         let obstacles = [];
         
-        // متغيرات ميكانيكية الصدى العكسي
         let isReboundActive = false;
         let reboundTimer = 0;
         let flashAlpha = 0;
 
+        // أماكن الكرات (اليسرى واليمنى بمسافة آمنة عن الحواف)
         const leftBall = {
             x: canvas.width / 4,
-            y: canvas.height - 150,
+            y: canvas.height - 120,
             radius: 18,
             color: '#00f3ff',
+            defaultX: canvas.width / 4,
             targetX: canvas.width / 4
         };
 
         const rightBall = {
             x: (canvas.width / 4) * 3,
-            y: canvas.height - 150,
+            y: canvas.height - 120,
             radius: 18,
             color: '#ff0055',
+            defaultX: (canvas.width / 4) * 3,
             targetX: (canvas.width / 4) * 3
         };
 
-        // التحكم باللمس أو الماوس
+        // التحكم باللمس أو الماوس (الضغط يبعد الكرة نحو الخارج)
         window.addEventListener('pointerdown', (e) => {
             if (isGameOver) {
                 resetGame();
@@ -86,9 +88,9 @@
             const x = e.clientX - rect.left;
             
             if (x < canvas.width / 2) {
-                leftBall.targetX = canvas.width / 4 - 60;
+                leftBall.targetX = 30; // التحرك لأقصى اليسار
             } else {
-                rightBall.targetX = (canvas.width / 4) * 3 + 60;
+                rightBall.targetX = canvas.width - 30; // التحرك لأقصى اليمين
             }
         });
 
@@ -97,20 +99,24 @@
             const x = e.clientX - rect.left;
             
             if (x < canvas.width / 2) {
-                leftBall.targetX = canvas.width / 4;
+                leftBall.targetX = leftBall.defaultX;
             } else {
-                rightBall.targetX = (canvas.width / 4) * 3;
+                rightBall.targetX = rightBall.defaultX;
             }
         });
 
         function spawnObstacle() {
-            const width = canvas.width / 2 - 40;
-            const x = Math.random() < 0.5 ? 20 : canvas.width / 2 + 20;
+            // عرض العائق يتناسب مع نصف الشاشة مع ترك مساحة فارغة للمرور
+            const sideWidth = (canvas.width / 2) - 40;
+            const isLeft = Math.random() < 0.5;
+            
+            // عائق يظهر إما في جهة اليسار أو جهة اليمين حصرياً لتترك فرصة للمرور في النصف الآخر
+            const x = isLeft ? 20 : canvas.width / 2 + 20;
             
             obstacles.push({
                 x: x,
-                y: -50,
-                width: width,
+                y: -60,
+                width: sideWidth,
                 height: 25,
                 passed: false
             });
@@ -121,7 +127,6 @@
         function update() {
             if (isGameOver) return;
 
-            // تحديث مؤقت الصدى العكسي
             if (isReboundActive) {
                 reboundTimer--;
                 flashAlpha = Math.sin(reboundTimer * 0.3) * 0.5 + 0.5;
@@ -131,14 +136,14 @@
                 }
             }
 
-            // نعومة الحركة (Lerp)
+            // حركة ناعمة للكرات
             leftBall.x += (leftBall.targetX - leftBall.x) * 0.2;
             rightBall.x += (rightBall.targetX - rightBall.x) * 0.2;
 
-            gameSpeed += 0.001;
+            gameSpeed += 0.0005;
 
             spawnTimer++;
-            if (spawnTimer > 70) {
+            if (spawnTimer > 80) { // زيادة الفاصل الزمني قليلاً لإعطاء فرصة للتركيز
                 spawnObstacle();
                 spawnTimer = 0;
             }
@@ -162,15 +167,12 @@
 
                 if (hitLeft || hitRight) {
                     if (!isReboundActive) {
-                        // تفعيل الصدى العكسي (فرصة نجاة إعجازية)
                         isReboundActive = true;
-                        reboundTimer = 25; // مدة الإفلات بالثصورات (حوالي نصف ثانية)
-                        
-                        // دفع الكرتين نحو المنتصف كارتداد عكسي سريع للإنقاذ
-                        leftBall.targetX = canvas.width / 4 + 40;
-                        rightBall.targetX = (canvas.width / 4) * 3 - 40;
+                        reboundTimer = 30;
+                        // ارتداد عكسي للإنقاذ
+                        leftBall.targetX = leftBall.defaultX + 40;
+                        rightBall.targetX = rightBall.defaultX - 40;
                     } else {
-                        // إذا اصطدم مرة أخرى أثناء التفعيل، تنتهي اللعبة
                         isGameOver = true;
                     }
                 }
@@ -186,14 +188,13 @@
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // تأثير الوميض عند تفعيل الصدى العكسي
             if (flashAlpha > 0) {
                 ctx.fillStyle = `rgba(0, 243, 255, ${flashAlpha * 0.2})`;
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
             }
 
-            // رسم خط المنتصف
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+            // خط المنتصف
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
             ctx.lineWidth = 2;
             ctx.setLineDash([5, 5]);
             ctx.beginPath();
@@ -202,7 +203,7 @@
             ctx.stroke();
             ctx.setLineDash([]);
 
-            // رسم العقبات
+            // العوائق
             ctx.shadowBlur = 15;
             for (let obs of obstacles) {
                 ctx.fillStyle = '#ff3366';
@@ -210,14 +211,14 @@
                 ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
             }
 
-            // رسم الدائرة اليسرى
+            // الكرة اليسرى
             ctx.fillStyle = leftBall.color;
             ctx.shadowColor = leftBall.color;
             ctx.beginPath();
             ctx.arc(leftBall.x, leftBall.y, leftBall.radius, 0, Math.PI * 2);
             ctx.fill();
 
-            // رسم الدائرة اليمنى
+            // الكرة اليمنى
             ctx.fillStyle = rightBall.color;
             ctx.shadowColor = rightBall.color;
             ctx.beginPath();
@@ -233,12 +234,12 @@
 
         function resetGame() {
             score = 0;
-            gameSpeed = 5;
+            gameSpeed = 4;
             obstacles = [];
             isGameOver = false;
             isReboundActive = false;
-            leftBall.targetX = canvas.width / 4;
-            rightBall.targetX = (canvas.width / 4) * 3;
+            leftBall.targetX = leftBall.defaultX;
+            rightBall.targetX = rightBall.defaultX;
         }
 
         function loop() {
