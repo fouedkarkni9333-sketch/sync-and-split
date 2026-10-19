@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -25,34 +25,34 @@
 </head>
 <body class="flex flex-col items-center justify-center min-h-screen relative overflow-hidden">
 
-    <!-- شاشة البداية (Start Menu) وقائمة الإعدادات في أعلى اليسار -->
-    <div id="start-screen" class="absolute inset-0 bg-slate-950 z-30 flex flex-col items-center justify-center p-6 text-center">
-        <!-- زر الإعدادات في أعلى اليسار قبل بدء اللعبة -->
-        <button id="settings-btn" class="absolute top-6 left-6 w-12 h-12 bg-slate-900 border border-slate-700 rounded-full flex items-center justify-center text-cyan-400 text-xl shadow-lg active:scale-95 transition-all">
+    <!-- شاشة البداية (Start Menu) -->
+    <div id="start-screen" class="absolute inset-0 bg-slate-950 z-50 flex flex-col items-center justify-center p-6 text-center">
+        <!-- زر الإعدادات في أعلى اليسار -->
+        <button id="settings-btn" class="absolute top-6 left-6 w-12 h-12 bg-slate-900 border border-slate-700 rounded-full flex items-center justify-center text-cyan-400 text-xl shadow-lg active:scale-95 transition-all cursor-pointer">
             ⚙️
         </button>
 
         <h1 class="text-4xl font-black tracking-widest text-rose-500 mb-2 drop-shadow-[0_0_15px_rgba(255,42,95,0.8)]">SYNC & SPLIT</h1>
-        <p class="text-gray-400 text-sm mb-8">اختبر سرعة تركيزك وانتباهك المطلق</p>
+        <p id="subtext-el" class="text-gray-400 text-sm mb-8">Test your absolute focus and reflexes</p>
         
-        <button id="start-btn" class="px-10 py-4 bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 font-black text-xl rounded-full shadow-[0_0_25px_rgba(0,243,255,0.5)] transform active:scale-95 transition-all cursor-pointer">
-            ابدأ اللعب
+        <button id="start-btn" class="px-10 py-4 bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 font-black text-xl rounded-full shadow-[0_0_25px_rgba(0,243,255,0.5)] transform active:scale-95 transition-all cursor-pointer z-50">
+            Play Game
         </button>
     </div>
 
-    <!-- نافذة الإعدادات واختيار اللغات (أكثر من 30 لغة) -->
-    <div id="settings-modal" class="hidden absolute inset-0 bg-slate-950/95 backdrop-blur-md z-40 flex flex-col items-center justify-center p-6 text-center">
-        <h2 class="text-3xl font-black text-cyan-400 mb-4">Settings / الإعدادات</h2>
-        <label class="text-gray-300 text-sm mb-2">Select Language (30+ Languages):</label>
-        <select id="lang-select" class="bg-slate-900 border border-cyan-500/50 text-white px-4 py-2.5 rounded-xl mb-6 outline-none shadow-md">
-            <option value="en">English (US)</option>
+    <!-- نافذة الإعدادات -->
+    <div id="settings-modal" class="hidden absolute inset-0 bg-slate-950/95 backdrop-blur-md z-50 flex flex-col items-center justify-center p-6 text-center">
+        <h2 id="set-title" class="text-3xl font-black text-cyan-400 mb-4">Settings</h2>
+        <label id="set-label" class="text-gray-300 text-sm mb-2">Select Language (30+ Languages):</label>
+        <select id="lang-select" class="bg-slate-900 border border-cyan-500/50 text-white px-4 py-2.5 rounded-xl mb-6 outline-none shadow-md cursor-pointer">
+            <option value="en" selected>English (US)</option>
             <option value="es">Español</option>
             <option value="fr">Français</option>
             <option value="de">Deutsch</option>
             <option value="it">Italiano</option>
             <option value="pt">Português</option>
             <option value="ru">Русский</option>
-            <option value="ar" selected>العربية</option>
+            <option value="ar">العربية</option>
             <option value="zh">中文 (Chinese)</option>
             <option value="ja">日本語 (Japanese)</option>
             <option value="ko">한국어 (Korean)</option>
@@ -76,26 +76,26 @@
             <option value="he">עברית</option>
             <option value="fa">فارسی</option>
         </select>
-        <button id="close-settings" class="px-8 py-3 bg-cyan-500 text-slate-950 font-bold rounded-xl shadow-lg active:scale-95 transition-all">
-            حفظ وإغلاق
+        <button id="close-settings" class="px-8 py-3 bg-cyan-500 text-slate-950 font-bold rounded-xl shadow-lg active:scale-95 transition-all cursor-pointer">
+            Save & Close
         </button>
     </div>
 
     <!-- واجهة اللعبة أثناء اللعب -->
     <div id="ui-overlay" class="absolute top-6 w-full max-w-md px-4 text-center pointer-events-none z-10 flex flex-col items-center">
         <div class="flex gap-6 text-lg font-bold text-gray-200 tracking-wider">
-            <div id="score-display">النقاط: 0</div>
-            <div id="best-score-display" class="text-amber-400">الرقم القياسي: 0</div>
+            <div id="score-display">Score: 0</div>
+            <div id="best-score-display" class="text-amber-400">Best: 0</div>
         </div>
     </div>
 
-    <!-- شاشة الخسارة (مطابقة تماماً للصورة وبالعربية) -->
-    <div id="game-over-modal" class="hidden absolute inset-0 bg-slate-950/90 backdrop-blur-md z-20 flex flex-col items-center justify-center p-6 text-center">
-        <h2 id="game-over-title" class="text-5xl font-black text-rose-600 tracking-wider mb-2 drop-shadow-[0_0_20px_rgba(255,0,0,0.8)]">سقطت في الاختبار!</h2>
-        <div id="final-score-label" class="text-gray-300 text-lg mb-1">النتيجة النهائية</div>
+    <!-- شاشة الخسارة -->
+    <div id="game-over-modal" class="hidden absolute inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex flex-col items-center justify-center p-6 text-center">
+        <h2 id="game-over-title" class="text-5xl font-black text-rose-600 tracking-wider mb-2 drop-shadow-[0_0_20px_rgba(255,0,0,0.8)]">Failed the Test!</h2>
+        <div id="final-score-label" class="text-gray-300 text-lg mb-1">Final Score</div>
         <div id="final-score" class="text-6xl font-extrabold text-cyan-400 mb-6">0</div>
-        <button id="restart-btn" class="pointer-events-auto px-8 py-3.5 bg-gradient-to-r from-rose-500 to-red-600 text-white font-bold text-lg rounded-full shadow-[0_0_20px_rgba(255,0,0,0.5)] transform active:scale-95 transition-all cursor-pointer">
-            حاول مجدداً
+        <button id="restart-btn" class="pointer-events-auto px-8 py-3.5 bg-gradient-to-r from-rose-500 to-red-600 text-white font-bold text-lg rounded-full shadow-[0_0_20px_rgba(255,0,0,0.5)] transform active:scale-95 transition-all cursor-pointer z-50">
+            Play Again
         </button>
     </div>
 
@@ -111,6 +111,9 @@
         const settingsModal = document.getElementById('settings-modal');
         const closeSettings = document.getElementById('close-settings');
         const langSelect = document.getElementById('lang-select');
+        const subtextEl = document.getElementById('subtext-el');
+        const setTitle = document.getElementById('set-title');
+        const setLabel = document.getElementById('set-label');
 
         const scoreDisplay = document.getElementById('score-display');
         const bestScoreDisplay = document.getElementById('best-score-display');
@@ -122,29 +125,64 @@
         const finalScoreLabel = document.getElementById('final-score-label');
 
         let gameStarted = false;
+        let currentLang = 'en';
 
-        // إدارة الإعدادات واللغات
-        settingsBtn.addEventListener('click', () => settingsModal.classList.remove('hidden'));
-        closeSettings.addEventListener('click', () => settingsModal.classList.add('hidden'));
+        settingsBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            settingsModal.classList.remove('hidden');
+        });
+        
+        closeSettings.addEventListener('click', (e) => {
+            e.stopPropagation();
+            settingsModal.classList.add('hidden');
+        });
 
         langSelect.addEventListener('change', (e) => {
-            const lang = e.target.value;
-            if(lang === 'ar') {
+            currentLang = e.target.value;
+            if(currentLang === 'ar') {
+                subtextEl.innerText = "اختبر سرعة تركيزك وانتباهك المطلق";
+                startBtn.innerText = "ابدأ اللعب";
+                setTitle.innerText = "الإعدادات";
+                setLabel.innerText = "اختر اللغة:";
+                closeSettings.innerText = "حفظ وإغلاق";
                 gameOverTitle.innerText = "سقطت في الاختبار!";
                 finalScoreLabel.innerText = "النتيجة النهائية";
                 restartBtn.innerText = "حاول مجدداً";
+                scoreDisplay.innerText = `النقاط: ${score}`;
+                bestScoreDisplay.innerText = `الرقم القياسي: ${bestScore}`;
             } else {
+                subtextEl.innerText = "Test your absolute focus and reflexes";
+                startBtn.innerText = "Play Game";
+                setTitle.innerText = "Settings";
+                setLabel.innerText = "Select Language (30+ Languages):";
+                closeSettings.innerText = "Save & Close";
                 gameOverTitle.innerText = "Failed the Test!";
                 finalScoreLabel.innerText = "Final Score";
                 restartBtn.innerText = "Play Again";
+                scoreDisplay.innerText = `Score: ${score}`;
+                bestScoreDisplay.innerText = `Best: ${bestScore}`;
             }
         });
 
-        startBtn.addEventListener('click', () => {
+        // ربط زر البداية بطريقة تضمن استجابته الفورية باللمس والضغط
+        function startGameAction(e) {
+            e.preventDefault();
+            e.stopPropagation();
             startScreen.classList.add('hidden');
             gameStarted = true;
             resetGame();
-        });
+        }
+        startBtn.addEventListener('click', startGameAction);
+        startBtn.addEventListener('touchend', startGameAction);
+
+        // ربط زر إعادة اللعب بطريقة تضمن العودة المباشرة
+        function restartGameAction(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            restartGame();
+        }
+        restartBtn.addEventListener('click', restartGameAction);
+        restartBtn.addEventListener('touchend', restartGameAction);
 
         let width, height;
         function resizeCanvas() {
@@ -158,7 +196,7 @@
 
         let score = 0;
         let bestScore = localStorage.getItem('sync_split_hardcore_best') || 0;
-        bestScoreDisplay.innerText = `الرقم القياسي: ${bestScore}`;
+        bestScoreDisplay.innerText = currentLang === 'ar' ? `الرقم القياسي: ${bestScore}` : `Best: ${bestScore}`;
 
         let isGameOver = false;
         let gameSpeed = 5.0;
@@ -187,12 +225,25 @@
             rightBall.x = rightBaseX();
         }
 
-        window.addEventListener('touchstart', (e) => { e.preventDefault(); handleTouch(e.touches); }, { passive: false });
-        window.addEventListener('touchmove', (e) => { e.preventDefault(); handleTouch(e.touches); }, { passive: false });
-        window.addEventListener('touchend', (e) => { e.preventDefault(); handleTouch(e.touches); }, { passive: false });
+        window.addEventListener('touchstart', (e) => { 
+            if (!gameStarted || isGameOver) return;
+            e.preventDefault(); 
+            handleTouch(e.touches); 
+        }, { passive: false });
+
+        window.addEventListener('touchmove', (e) => { 
+            if (!gameStarted || isGameOver) return;
+            e.preventDefault(); 
+            handleTouch(e.touches); 
+        }, { passive: false });
+
+        window.addEventListener('touchend', (e) => { 
+            if (!gameStarted || isGameOver) return;
+            e.preventDefault(); 
+            handleTouch(e.touches); 
+        }, { passive: false });
 
         function handleTouch(touches) {
-            if (!gameStarted || isGameOver) return;
             const rect = canvas.getBoundingClientRect();
             let lActive = false, rActive = false;
             for (let i = 0; i < touches.length; i++) {
@@ -257,7 +308,7 @@
 
                 if (!obs.passed && obs.y > leftBall.y + leftBall.radius) {
                     score += 10;
-                    scoreDisplay.innerText = `النقاط: ${score}`;
+                    scoreDisplay.innerText = currentLang === 'ar' ? `النقاط: ${score}` : `Score: ${score}`;
                     obs.passed = true;
                 }
 
@@ -315,7 +366,7 @@
             if (score > bestScore) {
                 bestScore = score;
                 localStorage.setItem('sync_split_hardcore_best', bestScore);
-                bestScoreDisplay.innerText = `الرقم القياسي: ${bestScore}`;
+                bestScoreDisplay.innerText = currentLang === 'ar' ? `الرقم القياسي: ${bestScore}` : `Best: ${bestScore}`;
             }
 
             finalScoreDisplay.innerText = score;
@@ -330,12 +381,10 @@
             isLeftPressed = false;
             isRightPressed = false;
             isGameOver = false;
-            scoreDisplay.innerText = `النقاط: ${score}`;
+            scoreDisplay.innerText = currentLang === 'ar' ? `النقاط: ${score}` : `Score: ${score}`;
             resetBallPositions();
-            gameOverModal.classList.add('hidden'); // يرجع للعب مباشرة بدون قوائم
+            gameOverModal.classList.add('hidden'); 
         }
-
-        restartBtn.addEventListener('click', restartGame);
 
         function gameLoop() {
             update();
