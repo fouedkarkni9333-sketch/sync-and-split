@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sync & Split</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #0b0f19;
+            color: #fff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            touch-action: none;
+            user-select: none;
+        }
+        canvas {
+            display: block;
+            background: #0b0f19;
+            margin: 0 auto;
+        }
+        #ui {
+            position: absolute;
+            top: 20px;
+            width: 100%;
+            text-align: center;
+            pointer-events: none;
+            font-size: 24px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            text-shadow: 0 0 10px rgba(0, 243, 255, 0.5);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui">المس الجانبين للتحكم</div>
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // ضبط حجم الشاشة ليتناسب مع الهواتف والحواسيب
+        function resize() {
+            canvas.width = window.innerWidth > 500 ? 450 : window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // حالة اللعبة
+        let score = 0;
+        let isGameOver = false;
+        let gameSpeed = 5;
+        let obstacles = [];
+        
+        // الدائرتان (اليسرى واليمنى)
+        const leftBall = {
+            x: canvas.width / 4,
+            y: canvas.height - 150,
+            radius: 18,
+            color: '#00f3ff',
+            targetX: canvas.width / 4
+        };
+
+        const rightBall = {
+            x: (canvas.width / 4) * 3,
+            y: canvas.height - 150,
+            radius: 18,
+            color: '#ff0055',
+            targetX: (canvas.width / 4) * 3
+        };
+
+        // التحكم باللمس أو الماوس
+        window.addEventListener('pointerdown', (e) => {
+            if (isGameOver) {
+                resetGame();
+                return;
+            }
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            
+            if (x < canvas.width / 2) {
+                leftBall.targetX = canvas.width / 4 - 60; // تحرك لليسار
+            } else {
+                rightBall.targetX = (canvas.width / 4) * 3 + 60; // تحرك لليمين
+            }
+        });
+
+        window.addEventListener('pointerup', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            
+            if (x < canvas.width / 2) {
+                leftBall.targetX = canvas.width / 4; // العودة للوضع الافتراضي
+            } else {
+                rightBall.targetX = (canvas.width / 4) * 3; // العودة للوضع الافتراضي
+            }
+        });
+
+        // توليد العقبات
+        function spawnObstacle() {
+            const width = canvas.width / 2 - 40;
+            const x = Math.random() < 0.5 ? 20 : canvas.width / 2 + 20;
+            
+            obstacles.push({
+                x: x,
+                y: -50,
+                width: width,
+                height: 25,
+                passed: false
+            });
+        }
+
+        let spawnTimer = 0;
+
+        function update() {
+            if (isGameOver) return;
+
+            // نعومة الحركة (Lerp)
+            leftBall.x += (leftBall.targetX - leftBall.x) * 0.2;
+            rightBall.x += (rightBall.targetX - rightBall.x) * 0.2;
+
+            // زيادة السرعة تدريجياً
+            gameSpeed += 0.001;
+
+            // إدارة العقبات
+            spawnTimer++;
+            if (spawnTimer > 70) {
+                spawnObstacle();
+                spawnTimer = 0;
+            }
+
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                obstacles[i].y += gameSpeed;
+
+                // التحقق من الاصطدام بالدائرة اليسرى
+                if (
+                    leftBall.x + leftBall.radius > obstacles[i].x &&
+                    leftBall.x - leftBall.radius < obstacles[i].x + obstacles[i].width &&
+                    leftBall.y + leftBall.radius > obstacles[i].y &&
+                    leftBall.y - leftBall.radius < obstacles[i].y + obstacles[i].height
+                ) {
+                    isGameOver = true;
+                }
+
+                // التحقق من الاصطدام بالدائرة اليمنى (إذا كانت العقبة في الجهة اليمنى)
+                // (للتوضيح: سنقوم بتوزيع العقبات عشوائياً بين الجهتين لتتطلب التركيز)
+                if (
+                    rightBall.x + rightBall.radius > obstacles[i].x &&
+                    rightBall.x - rightBall.radius < obstacles[i].x + obstacles[i].width &&
+                    rightBall.y + rightBall.radius > obstacles[i].y &&
+                    rightBall.y - rightBall.radius < obstacles[i].y + obstacles[i].height
+                ) {
+                    isGameOver = true;
+                }
+
+                // حساب النقاط
+                if (!obstacles[i].passed && obstacles[i].y > canvas.height) {
+                    score += 10;
+                    obstacles[i].passed = true;
+                    obstacles.splice(i, 1);
+                }
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // رسم خط منتصف الشاشة الفاصل
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.moveTo(canvas.width / 2, 0);
+            ctx.lineTo(canvas.width / 2, canvas.height);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // رسم العقبات بتصميم نيون
+            ctx.shadowBlur = 15;
+            for (let obs of obstacles) {
+                ctx.fillStyle = '#ff3366';
+                ctx.shadowColor = '#ff3366';
+                ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+            }
+
+            // رسم الدائرة اليسرى
+            ctx.fillStyle = leftBall.color;
+            ctx.shadowColor = leftBall.color;
+            ctx.beginPath();
+            ctx.arc(leftBall.x, leftBall.y, leftBall.radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // رسم الدائرة اليمنى
+            ctx.fillStyle = rightBall.color;
+            ctx.shadowColor = rightBall.color;
+            ctx.beginPath();
+            ctx.arc(rightBall.x, rightBall.y, rightBall.radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.shadowBlur = 0; // إيقاف التوهج للنص
+
+            // واجهة النقاط
+            document.getElementById('ui').innerText = isGameOver ? 
+                `انتهت اللعبة! النتيجة: ${score}\nانقر لإعادة المحاولة` : 
+                `النقاط: ${score}`;
+        }
+
+        function resetGame() {
+            score = 0;
+            gameSpeed = 5;
+            obstacles = [];
+            isGameOver = false;
+            leftBall.targetX = canvas.width / 4;
+            rightBall.targetX = (canvas.width / 4) * 3;
+        }
+
+        function loop() {
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        loop();
+    </script>
+</body>
+</html>
