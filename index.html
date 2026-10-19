@@ -1,230 +1,363 @@
+```html
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Sync & Split</title>
+    <!-- تضمين مكتبة Tailwind CSS للتنسيق الحديث والسريع -->
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
+        /* تخصيصات خلفية اللعبة والتحكم باللمس */
         body {
             margin: 0;
             padding: 0;
-            background-color: #0b0f19;
-            color: #fff;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #080c14;
+            color: #ffffff;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
             overflow: hidden;
             touch-action: none;
             user-select: none;
+            -webkit-user-select: none;
         }
         canvas {
             display: block;
-            background: #0b0f19;
-            margin: 0 auto;
-        }
-        #ui {
-            position: absolute;
-            top: 25px;
-            width: 100%;
-            text-align: center;
-            pointer-events: none;
-            font-size: 20px;
-            font-weight: bold;
-            letter-spacing: 1px;
-            text-shadow: 0 0 10px rgba(0, 243, 255, 0.5);
-            z-index: 10;
+            touch-action: none;
         }
     </style>
 </head>
-<body>
+<body class="flex flex-col items-center justify-center min-h-screen relative overflow-hidden">
 
-    <div id="ui">اضغط واستمر للتباعد، ارفع إصبعك للتقارب</div>
-    <canvas id="gameCanvas"></canvas>
+    <!-- واجهة المستخدم والتوجيهات -->
+    <div id="ui-overlay" class="absolute top-6 w-full max-w-md px-4 text-center pointer-events-none z-10 flex flex-col items-center">
+        <h1 class="text-3xl font-extrabold tracking-widest text-cyan-400 drop-shadow-[0_0_12px_rgba(0,243,255,0.8)] mb-1">SYNC & SPLIT</h1>
+        <div id="score-display" class="text-xl font-bold text-gray-200 tracking-wider drop-shadow-md">النقاط: 0</div>
+        <p id="instruction-text" class="text-sm font-medium text-gray-400 mt-2 bg-slate-900/60 px-4 py-1.5 rounded-full border border-slate-700/50 backdrop-blur-sm">
+            المس اليسار لإبعاد الكرة الزرقاء | المس اليمين لإبعاد الكرة الحمراء
+        </p>
+    </div>
+
+    <!-- شاشة انتهاء اللعبة Overlay -->
+    <div id="game-over-modal" class="hidden absolute inset-0 bg-slate-950/85 backdrop-blur-md z-20 flex flex-col items-center justify-center p-6 text-center animate-fade-in">
+        <h2 class="text-4xl font-black text-rose-500 tracking-wider mb-2 drop-shadow-[0_0_15px_rgba(255,51,102,0.8)]">انتهت اللعبة!</h2>
+        <div class="text-gray-300 text-lg mb-1">مجموع النقاط</div>
+        <div id="final-score" class="text-5xl font-extrabold text-cyan-400 mb-6 drop-shadow-[0_0_20px_rgba(0,243,255,0.6)]">0</div>
+        <button id="restart-btn" class="pointer-events-auto px-8 py-3.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-lg rounded-full shadow-[0_0_25px_rgba(0,243,255,0.5)] transform active:scale-95 transition-all cursor-pointer">
+            إعادة المحاولة
+        </button>
+    </div>
+
+    <!-- منطقة الرسم المحورية (Canvas) -->
+    <canvas id="gameCanvas" class="bg-slate-950 shadow-2xl border-x border-slate-800/40"></canvas>
 
     <script>
+        // إعداد عنصر الـ Canvas والسياق
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
-        function resize() {
-            canvas.width = window.innerWidth > 500 ? 450 : window.innerWidth;
-            canvas.height = window.innerHeight;
-        }
-        window.addEventListener('resize', resize);
-        resize();
+        const scoreDisplay = document.getElementById('score-display');
+        const gameOverModal = document.getElementById('game-over-modal');
+        const finalScoreDisplay = document.getElementById('final-score');
+        const restartBtn = document.getElementById('restart-btn');
 
+        // متغيرات الحجم والأبعاد الموحدة
+        let width, height;
+        function resizeCanvas() {
+            width = Math.min(window.innerWidth, 480);
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // متغيرات حالة اللعبة
         let score = 0;
         let isGameOver = false;
-        let gameSpeed = 3.5;
+        let gameSpeed = 3.8;
         let obstacles = [];
-        let isTouching = false;
+        let spawnTimer = 0;
+        const spawnInterval = 95; // إطار زمني متناسق بين ظهور الحواجز
 
-        // إحداثيات المواضع الثابتة (الداخل والخارج)
-        const leftInner = () => canvas.width / 2 - 45;
-        const leftOuter = () => 45;
-        const rightInner = () => canvas.width / 2 + 45;
-        const rightOuter = () => canvas.width - 45;
+        // حالة الضغط المستقلة للجانبين الأيسر والأيمن
+        let isLeftPressed = false;
+        let isRightPressed = false;
+
+        // تعريف إحداثيات الكرتين والوضع الافتراضي
+        const ballRadius = 15;
+        
+        // المواضع الأساسية للكرة اليسرى
+        const leftBaseX = () => width / 4;
+        const leftOuterX = () => 40;
+
+        // المواضع الأساسية للكرة اليمنى
+        const rightBaseX = () => (width / 4) * 3;
+        const rightOuterX = () => width - 40;
 
         const leftBall = {
-            x: leftInner(),
-            y: canvas.height - 130,
-            radius: 16,
+            x: leftBaseX(),
+            y: 0,
+            radius: ballRadius,
             color: '#00f3ff',
-            targetX: leftInner()
+            targetX: leftBaseX()
         };
 
         const rightBall = {
-            x: rightInner(),
-            y: canvas.height - 130,
-            radius: 16,
+            x: rightBaseX(),
+            y: 0,
+            radius: ballRadius,
             color: '#ff0055',
-            targetX: rightInner()
+            targetX: rightBaseX()
         };
 
-        // التحكم: الضغط يبعد الكرتين للخارج، والرفع يعيدهما للداخل
-        window.addEventListener('pointerdown', () => {
-            if (isGameOver) {
-                resetGame();
-                return;
+        // ضبط الارتفاع المبدئي للكرات
+        function resetBallPositions() {
+            leftBall.y = height - 140;
+            rightBall.y = height - 140;
+            leftBall.targetX = leftBaseX();
+            rightBall.targetX = rightBaseX();
+            leftBall.x = leftBaseX();
+            rightBall.x = rightBaseX();
+        }
+
+        // إدارة إدخالات اللمس والماوس بدقة لكل جانب على حدة
+        function handlePointerEvents() {
+            // معالجة الأحداث باللمس متعدد النقاط (Multi-touch)
+            window.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                if (isGameOver) return;
+                updateTouchStates(e.touches);
+            }, { passive: false });
+
+            window.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                if (isGameOver) return;
+                updateTouchStates(e.touches);
+            }, { passive: false });
+
+            window.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                if (isGameOver) return;
+                updateTouchStates(e.touches);
+            }, { passive: false });
+
+            window.addEventListener('touchcancel', (e) => {
+                e.preventDefault();
+                updateTouchStates(e.touches);
+            }, { passive: false });
+
+            // دعم التحكم بالماوس للحواسيب
+            window.addEventListener('mousedown', (e) => {
+                if (isGameOver) return;
+                const rect = canvas.getBoundingClientRect();
+                const clickX = e.clientX - rect.left;
+                if (clickX < width / 2) {
+                    isLeftPressed = true;
+                } else {
+                    isRightPressed = true;
+                }
+            });
+
+            window.addEventListener('mouseup', (e) => {
+                const rect = canvas.getBoundingClientRect();
+                const clickX = e.clientX - rect.left;
+                if (clickX < width / 2) {
+                    isLeftPressed = false;
+                } else {
+                    isRightPressed = false;
+                }
+            });
+        }
+
+        function updateTouchStates(touches) {
+            const rect = canvas.getBoundingClientRect();
+            let leftActive = false;
+            let rightActive = false;
+
+            for (let i = 0; i < touches.length; i++) {
+                const touchX = touches[i].clientX - rect.left;
+                if (touchX < width / 2) {
+                    leftActive = true;
+                } else {
+                    rightActive = true;
+                }
             }
-            isTouching = true;
-        });
 
-        window.addEventListener('pointerup', () => {
-            isTouching = false;
-        });
+            isLeftPressed = leftActive;
+            isRightPressed = rightActive;
+        }
 
+        handlePointerEvents();
+
+        // إنشاء الحواجز بدقة لتفادي أي انسداد مباشر
         function spawnObstacle() {
-            // نوعان فقط من الحواجز بشكل واضح جداً:
-            // type 0: الحاجز يغلق الأطراف ويترك المنتصف مفتوحاً (تحتاج عدم الضغط)
-            // type 1: الحاجز يغلق المنتصف ويترك الأطراف مفتوحة (تحتاج الضغط والاستمرار)
+            // نوعان متناسقان للعبة:
+            // Type 0: الفتحات في المنتصف (تتطلب ترك الكرات في الوضع الافتراضي)
+            // Type 1: الفتحات في الأطراف الخارجة (تتطلب الضغط لإبعاد الكرات للخارج)
             const type = Math.random() < 0.5 ? 0 : 1;
             
             obstacles.push({
                 y: -40,
-                height: 24,
+                height: 22,
                 type: type,
                 passed: false
             });
         }
 
-        let spawnTimer = 0;
-
+        // تحديث المنطق البرمجي والحسابات
         function update() {
             if (isGameOver) return;
 
-            // تحديث الأهداف بناء على الضغط
-            if (isTouching) {
-                leftBall.targetX = leftOuter();
-                rightBall.targetX = rightOuter();
-            } else {
-                leftBall.targetX = leftInner();
-                rightBall.targetX = rightInner();
-            }
+            // تحديث الأهداف بناءً على حالة النقر والضغط
+            leftBall.targetX = isLeftPressed ? leftOuterX() : leftBaseX();
+            rightBall.targetX = isRightPressed ? rightOuterX() : rightBaseX();
 
-            // حركة ناعمة وسريعة للكرات
-            leftBall.x += (leftBall.targetX - leftBall.x) * 0.25;
-            rightBall.x += (rightBall.targetX - rightBall.x) * 0.25;
+            // حركة ناعمة ومباشرة للكرات (Lerp Animation)
+            leftBall.x += (leftBall.targetX - leftBall.x) * 0.28;
+            rightBall.x += (rightBall.targetX - rightBall.x) * 0.28;
 
-            gameSpeed += 0.0003;
+            // تسارع تدريجي طفيف لزيادة التحدي
+            gameSpeed += 0.0004;
 
+            // إدارة ظهور وتوقيت الحواجز
             spawnTimer++;
-            if (spawnTimer > 90) {
+            if (spawnTimer > spawnInterval) {
                 spawnObstacle();
                 spawnTimer = 0;
             }
 
+            // فحص الاصطدامات وتحديث حركة الحواجز
             for (let i = obstacles.length - 1; i >= 0; i--) {
                 let obs = obstacles[i];
                 obs.y += gameSpeed;
 
-                // التثبت من الاصطدام عند وصول الحاجز لارتفاع الكرات
-                if (Math.abs(obs.y - leftBall.y) < leftBall.radius + obs.height / 2) {
+                // فحص المنطقة الزمنية والارتفاع عند وصول الحاجز لمستوى الكرات
+                const inHitZone = Math.abs(obs.y - leftBall.y) < (leftBall.radius + obs.height / 2);
+
+                if (inHitZone) {
                     if (obs.type === 0) {
-                        // الممر في المنتصف: تخسر إذا كانت الكرات في الأطراف (الخارج)
-                        if (leftBall.x < leftInner() - 20 || rightBall.x > rightInner() + 20) {
-                            isGameOver = true;
+                        // نوع 0: الفتحة بالداخل، تخسر إذا كانت إحدى الكرات في الخارج
+                        if (leftBall.x < leftBaseX() - 25 || rightBall.x > rightBaseX() + 25) {
+                            triggerGameOver();
                         }
                     } else if (obs.type === 1) {
-                        // الممر في الأطراف: تخسر إذا كانت الكرات في المنتصف (الداخل)
-                        if (leftBall.x > leftOuter() + 30 || rightBall.x < rightOuter() - 30) {
-                            isGameOver = true;
+                        // نوع 1: الفتحة بالخارج، تخسر إذا كانت إحدى الكرات في الداخل
+                        if (leftBall.x > leftOuterX() + 30 || rightBall.x < rightOuterX() - 30) {
+                            triggerGameOver();
                         }
                     }
                 }
 
-                if (!obs.passed && obs.y > canvas.height) {
+                // حساب النقاط عند تجوز الحاجز بنجاح
+                if (!obs.passed && obs.y > leftBall.y + leftBall.radius) {
                     score += 10;
+                    scoreDisplay.innerText = `النقاط: ${score}`;
                     obs.passed = true;
+                }
+
+                // حذف الحواجز الخارجه عن الشاشة
+                if (obs.y > height + 50) {
                     obstacles.splice(i, 1);
                 }
             }
         }
 
+        // رسم عناصر اللعبة والمؤثرات البصرية
         function draw() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.clearRect(0, 0, width, height);
 
-            // خط المنتصف
+            // 1. رسم خط الفصل الرأسي في منتصف الشاشة
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
             ctx.lineWidth = 2;
-            ctx.setLineDash([6, 6]);
+            ctx.setLineDash([8, 8]);
             ctx.beginPath();
-            ctx.moveTo(canvas.width / 2, 0);
-            ctx.lineTo(canvas.width / 2, canvas.height);
+            ctx.moveTo(width / 2, 0);
+            ctx.lineTo(width / 2, height);
             ctx.stroke();
             ctx.setLineDash([]);
 
-            // رسم الحواجز
-            ctx.shadowBlur = 12;
-            ctx.fillStyle = '#ff3366';
-            ctx.shadowColor = '#ff3366';
+            // 2. رسم الحواجز النيون
+            ctx.shadowBlur = 14;
+            ctx.fillStyle = '#ff2a5f';
+            ctx.shadowColor = '#ff2a5f';
 
             for (let obs of obstacles) {
                 if (obs.type === 0) {
-                    // فتحة بالمنتصف: نرسم كتلة باليسار وكتلة باليمين
-                    ctx.fillRect(0, obs.y, leftInner() - 25, obs.height);
-                    ctx.fillRect(rightInner() + 25, obs.y, canvas.width - (rightInner() + 25), obs.height);
+                    // فتحة بالداخل: رسم كتلتين مغطيتين للأطراف
+                    const leftWidth = leftBaseX() - 30;
+                    const rightWidth = width - (rightBaseX() + 30);
+                    
+                    ctx.fillRect(0, obs.y, leftWidth, obs.height);
+                    ctx.fillRect(rightBaseX() + 30, obs.y, rightWidth, obs.height);
                 } else {
-                    // فتحة بالأطراف: نرسم كتلة واحدة بالمنتصف تمنع المرور الداخلي
-                    const centerWidth = rightInner() - leftInner() + 40;
-                    ctx.fillRect(canvas.width / 2 - centerWidth / 2, obs.y, centerWidth, obs.height);
+                    // فتحة بالأطراف: رسم كتلة في المنتصف تغطي الوسط
+                    const centerLeft = leftOuterX() + 30;
+                    const centerWidth = (rightOuterX() - 30) - centerLeft;
+                    
+                    ctx.fillRect(centerLeft, obs.y, centerWidth, obs.height);
                 }
             }
 
-            // رسم الكرات
+            // 3. رسم الكرة اليسرى (الزرقاء)
             ctx.fillStyle = leftBall.color;
             ctx.shadowColor = leftBall.color;
+            ctx.shadowBlur = 18;
             ctx.beginPath();
             ctx.arc(leftBall.x, leftBall.y, leftBall.radius, 0, Math.PI * 2);
             ctx.fill();
 
+            // 4. رسم الكرة اليمنى (الحمراء)
             ctx.fillStyle = rightBall.color;
             ctx.shadowColor = rightBall.color;
+            ctx.shadowBlur = 18;
             ctx.beginPath();
             ctx.arc(rightBall.x, rightBall.y, rightBall.radius, 0, Math.PI * 2);
             ctx.fill();
 
+            // إيقاف التوهج لباقي السحب
             ctx.shadowBlur = 0;
-
-            document.getElementById('ui').innerText = isGameOver ? 
-                `انتهت اللعبة! النتيجة: ${score}\nاضغط لإعادة المحاولة` : 
-                `النقاط: ${score}`;
         }
 
-        function resetGame() {
+        // إنهاء اللعبة وعرض النتيجة
+        function triggerGameOver() {
+            isGameOver = true;
+            finalScoreDisplay.innerText = score;
+            gameOverModal.classList.remove('hidden');
+        }
+
+        // إعادة تشغيل اللعبة
+        function restartGame() {
             score = 0;
-            gameSpeed = 3.5;
+            gameSpeed = 3.8;
             obstacles = [];
+            spawnTimer = 0;
+            isLeftPressed = false;
+            isRightPressed = false;
             isGameOver = false;
-            isTouching = false;
-            leftBall.targetX = leftInner();
-            rightBall.targetX = rightInner();
+            scoreDisplay.innerText = `النقاط: ${score}`;
+            resetBallPositions();
+            gameOverModal.classList.add('hidden');
         }
 
-        function loop() {
+        restartBtn.addEventListener('click', restartGame);
+
+        // حلقة اللعبة الرئيسية (Game Loop)
+        function gameLoop() {
             update();
             draw();
-            requestAnimationFrame(loop);
+            requestAnimationFrame(gameLoop);
         }
 
-        loop();
+        // بدء التشغيل
+        resetBallPositions();
+        requestAnimationFrame(gameLoop);
     </script>
 </body>
 </html>
+```
+
+### التحديثات والتعديلات المُنفذة:
+1. **استقلالية التحكم بالجانبين:** تم إعداد نظام لمس متعدد الفرع (Multi-touch)، حيث ينفصل الجانب الأيسر لتوجيه الكرة الزرقاء بالكامل، بينما يتكفل الجانب الأيمن بتوجيه الكرة الحمراء دون أي تداخل.
+2. **تصميم حواجز دقيق وغير عشوائي:** الحواجز أصبحت منسقة بنوعين ثابتين (فتحات في الوسط لمرور الكرات في وضع الارتخاء، وفتحات في الأطراف لمرور الكرات في وضع الضغط)، مما يضمن عدم وجود أي اصطدام مفاجئ أو مستحيل عند البداية.
+3. **مظهر النيون الحديث:** إدراج تأثيرات التوهج البصري (Neon Glow) للكرات والحواجز، مع إطار أنيق ومناسب للهواتف الذكية وتدرجات ألوان جذابة.
+```
