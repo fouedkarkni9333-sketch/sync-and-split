@@ -26,7 +26,7 @@
             width: 100%;
             text-align: center;
             pointer-events: none;
-            font-size: 24px;
+            font-size: 22px;
             font-weight: bold;
             letter-spacing: 2px;
             text-shadow: 0 0 10px rgba(0, 243, 255, 0.5);
@@ -36,7 +36,7 @@
 </head>
 <body>
 
-    <div id="ui">المس الجانبين للتحكم</div>
+    <div id="ui">المس اليمين أو اليسار للتحكم</div>
     <canvas id="gameCanvas"></canvas>
 
     <script>
@@ -52,33 +52,33 @@
 
         let score = 0;
         let isGameOver = false;
-        let gameSpeed = 4;
+        let gameSpeed = 3.5;
         let obstacles = [];
         
         let isReboundActive = false;
         let reboundTimer = 0;
         let flashAlpha = 0;
 
-        // أماكن الكرات (اليسرى واليمنى بمسافة آمنة عن الحواف)
+        // الكرتان في المنتصف لكل نصف شاشة
         const leftBall = {
             x: canvas.width / 4,
             y: canvas.height - 120,
-            radius: 18,
+            radius: 16,
             color: '#00f3ff',
-            defaultX: canvas.width / 4,
+            baseX: canvas.width / 4,
             targetX: canvas.width / 4
         };
 
         const rightBall = {
             x: (canvas.width / 4) * 3,
             y: canvas.height - 120,
-            radius: 18,
+            radius: 16,
             color: '#ff0055',
-            defaultX: (canvas.width / 4) * 3,
+            baseX: (canvas.width / 4) * 3,
             targetX: (canvas.width / 4) * 3
         };
 
-        // التحكم باللمس أو الماوس (الضغط يبعد الكرة نحو الخارج)
+        // التحكم باللمس (الضغط ينقل الكرة يميناً أو يساراً داخل نصفها)
         window.addEventListener('pointerdown', (e) => {
             if (isGameOver) {
                 resetGame();
@@ -88,36 +88,27 @@
             const x = e.clientX - rect.left;
             
             if (x < canvas.width / 2) {
-                leftBall.targetX = 30; // التحرك لأقصى اليسار
+                // تبديل مكان الكرة اليسرى عند اللمس لتتجنب العقبة
+                leftBall.targetX = leftBall.baseX === canvas.width / 4 ? canvas.width / 4 - 50 : canvas.width / 4;
             } else {
-                rightBall.targetX = canvas.width - 30; // التحرك لأقصى اليمين
-            }
-        });
-
-        window.addEventListener('pointerup', (e) => {
-            const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            
-            if (x < canvas.width / 2) {
-                leftBall.targetX = leftBall.defaultX;
-            } else {
-                rightBall.targetX = rightBall.defaultX;
+                rightBall.targetX = rightBall.baseX === (canvas.width / 4) * 3 ? (canvas.width / 4) * 3 + 50 : (canvas.width / 4) * 3;
             }
         });
 
         function spawnObstacle() {
-            // عرض العائق يتناسب مع نصف الشاشة مع ترك مساحة فارغة للمرور
-            const sideWidth = (canvas.width / 2) - 40;
+            // جعل عرض العقبة أصغر بكثير من نصف الشاشة لتترك مساحة كافية للمرور
+            const halfW = canvas.width / 2;
+            const obsWidth = 80; 
             const isLeft = Math.random() < 0.5;
-            
-            // عائق يظهر إما في جهة اليسار أو جهة اليمين حصرياً لتترك فرصة للمرور في النصف الآخر
-            const x = isLeft ? 20 : canvas.width / 2 + 20;
+            // موقع عشوائي داخل النصف المخصص بحيث لا يغطي الشاشة بأكملها
+            const randomOffset = Math.random() * (halfW - obsWidth - 40) + 20;
+            const x = isLeft ? randomOffset : halfW + randomOffset;
             
             obstacles.push({
                 x: x,
-                y: -60,
-                width: sideWidth,
-                height: 25,
+                y: -50,
+                width: obsWidth,
+                height: 22,
                 passed: false
             });
         }
@@ -136,14 +127,13 @@
                 }
             }
 
-            // حركة ناعمة للكرات
             leftBall.x += (leftBall.targetX - leftBall.x) * 0.2;
             rightBall.x += (rightBall.targetX - rightBall.x) * 0.2;
 
             gameSpeed += 0.0005;
 
             spawnTimer++;
-            if (spawnTimer > 80) { // زيادة الفاصل الزمني قليلاً لإعطاء فرصة للتركيز
+            if (spawnTimer > 90) { // مسافة أوسع بين العقبات
                 spawnObstacle();
                 spawnTimer = 0;
             }
@@ -168,10 +158,10 @@
                 if (hitLeft || hitRight) {
                     if (!isReboundActive) {
                         isReboundActive = true;
-                        reboundTimer = 30;
-                        // ارتداد عكسي للإنقاذ
-                        leftBall.targetX = leftBall.defaultX + 40;
-                        rightBall.targetX = rightBall.defaultX - 40;
+                        reboundTimer = 25;
+                        // إعادة الكرات للوضع الآمن عند التفعيل
+                        leftBall.targetX = leftBall.baseX;
+                        rightBall.targetX = rightBall.baseX;
                     } else {
                         isGameOver = true;
                     }
@@ -211,14 +201,13 @@
                 ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
             }
 
-            // الكرة اليسرى
+            // الكرات
             ctx.fillStyle = leftBall.color;
             ctx.shadowColor = leftBall.color;
             ctx.beginPath();
             ctx.arc(leftBall.x, leftBall.y, leftBall.radius, 0, Math.PI * 2);
             ctx.fill();
 
-            // الكرة اليمنى
             ctx.fillStyle = rightBall.color;
             ctx.shadowColor = rightBall.color;
             ctx.beginPath();
@@ -234,12 +223,12 @@
 
         function resetGame() {
             score = 0;
-            gameSpeed = 4;
+            gameSpeed = 3.5;
             obstacles = [];
             isGameOver = false;
             isReboundActive = false;
-            leftBall.targetX = leftBall.defaultX;
-            rightBall.targetX = rightBall.defaultX;
+            leftBall.targetX = leftBall.baseX;
+            rightBall.targetX = rightBall.baseX;
         }
 
         function loop() {
